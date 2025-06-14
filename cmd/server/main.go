@@ -14,7 +14,7 @@ func main() {
 		Host:         os.Getenv("ERESA_HOST"),
 		AuthHost:     os.Getenv("ERESA_AUTH_HOST"),
 		ClientID:     os.Getenv("ERESA_CLIENT_ID"),
-		RefreshToken: os.Getenv("ERESA_CLIENT_SECRET"),
+		RefreshToken: os.Getenv("ERESA_REFRESH_TOKEN"),
 	}
 
 	pcli, err := client.NewPeepaClient(pcfg)

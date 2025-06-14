@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -45,7 +46,13 @@ func (c *PeepaClient) getAccessToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
+
+	for k, v := range commonHeaders {
+		req.Header.Set(k, v)
+	}
+	for k, v := range tokenHeaders {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := c.hc.Do(req)
 	if err != nil {
@@ -54,6 +61,7 @@ func (c *PeepaClient) getAccessToken() (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		fmt.Println(resp)
 		return "", fmt.Errorf("auth request failed with status: %s", resp.Status)
 	}
 
@@ -77,22 +85,22 @@ func (c *PeepaClient) ensureAccessToken() error {
 	return nil
 }
 
-func (c *PeepaClient) GetByASIN(asin string) error {
+func (c *PeepaClient) GetByASIN(asin string) (*Product, error) {
 	if err := c.ensureAccessToken(); err != nil {
-		return err
+		return nil, err
 	}
 
 	reqBody := ProductDetailRequest{
 		Query: `
-				query GetProductDetail($asin: String, $domain: String, $isLite: Boolean, $isDetail: Boolean, $nocache: Boolean, $countpv: Boolean) {
-					getProductDetail(asin: $asin, domain: $domain, isLite: $isLite, isDetail: $isDetail, nocache: $nocache, countpv: $countpv) {
-						asin
-						json
-						createdAt
-						updatedAt
-						__typename
-					}
-				}`,
+			query GetProductDetail($asin: String, $domain: String, $isLite: Boolean, $isDetail: Boolean, $nocache: Boolean, $countpv: Boolean) {
+				getProductDetail(asin: $asin, domain: $domain, isLite: $isLite, isDetail: $isDetail, nocache: $nocache, countpv: $countpv) {
+					asin
+					json
+					createdAt
+					updatedAt
+					__typename
+				}
+			}`,
 		Variables: ProductDetailVariables{
 			ASIN:     asin,
 			Domain:   "5",
@@ -105,32 +113,50 @@ func (c *PeepaClient) GetByASIN(asin string) error {
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	url := fmt.Sprintf("%s/graphql", c.cfg.Host)
 	req, err := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
-	req.Header.Set("Content-Type", "application/json")
+	for k, v := range commonHeaders {
+		req.Header.Set(k, v)
+	}
+	for k, v := range graphqlHeaders {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error: %s – %s", resp.Status, string(bodyBytes))
+		return nil, fmt.Errorf("API error: %s – %s", resp.Status, string(bodyBytes))
 	}
 
 	bodyBytes, err = io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Printf("Response body: %s\n", string(bodyBytes))
-	return nil
+
+	var rawResp rawProductDetailResponse
+	if err := json.Unmarshal(bodyBytes, &rawResp); err != nil {
+		return nil, err
+	}
+
+	jsonStr := rawResp.Data.GetProductDetail.JSON
+	var products []Product
+	if err := json.Unmarshal([]byte(jsonStr), &products); err != nil {
+		return nil, err
+	}
+
+	log.Printf("Fetched product detail: %+v\n", products[0])
+	return &products[0], nil
 }

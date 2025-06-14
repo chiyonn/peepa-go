@@ -1,8 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
-	"fmt"
 
 	"github.com/go-chi/chi/v5"
 
@@ -22,9 +23,18 @@ func NewProductHandler(cli *client.PeepaClient) *ProductHandler {
 func (h *ProductHandler) GetByASIN(w http.ResponseWriter, r *http.Request) {
 	asin := chi.URLParam(r, "asin")
 
-	product := h.cli.GetByASIN(asin)
+	product, err := h.cli.GetByASIN(asin)
+	if err != nil {
+		log.Printf("failed to get product: %v", err)
+		http.Error(w, "failed to fetch product", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"asin": "%s", "title": "Sample Product"}`, asin)
+
+	if err := json.NewEncoder(w).Encode(product); err != nil {
+		log.Printf("failed to encode response: %v", err)
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+	}
 }
