@@ -1,23 +1,30 @@
 package main
 
 import (
+	"os"
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/chiyonn/peepa-go/internal/core"
+	"github.com/chiyonn/peepa-go/internal/client"
+	"github.com/chiyonn/peepa-go/internal/router"
 )
 
 func main() {
-	r := chi.NewRouter()
+	pcfg := &client.PeepaConfig{
+		Host: core.MustReadSecret("ERESA_HOST"),
+		AuthHost: core.MustReadSecret("ERESA_AUTH_HOST"),
+		ClientID: core.MustReadSecret("ERESA_CLIENT_ID"),
+		RefreshToken: core.MustReadSecret("ERESA_CLIENT_SECRET"),
+	}
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Hello, Chi!")
-	})
+	pcli, err := client.NewPeepaClient(pcfg)
+	if err != nil {
+		fmt.Errorf("failed to inizialize peepa client: %w", err)
+		os.Exit(0)
+	}
 
-	r.Get("/hello/{name}", func(w http.ResponseWriter, r *http.Request) {
-		name := chi.URLParam(r, "name")
-		fmt.Fprintf(w, "Hello, %s!\n", name)
-	})
+	r := router.NewRouter(pcli)
 
 	http.ListenAndServe(":8080", r)
 }
