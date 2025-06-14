@@ -5,23 +5,22 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/chiyonn/peepa-go/internal/core"
 	"github.com/chiyonn/peepa-go/internal/client"
 	"github.com/chiyonn/peepa-go/internal/router"
 )
 
 func main() {
 	pcfg := &client.PeepaConfig{
-		Host: core.MustReadSecret("ERESA_HOST"),
-		AuthHost: core.MustReadSecret("ERESA_AUTH_HOST"),
-		ClientID: core.MustReadSecret("ERESA_CLIENT_ID"),
-		RefreshToken: core.MustReadSecret("ERESA_CLIENT_SECRET"),
+		Host:         os.Getenv("ERESA_HOST"),
+		AuthHost:     os.Getenv("ERESA_AUTH_HOST"),
+		ClientID:     os.Getenv("ERESA_CLIENT_ID"),
+		RefreshToken: os.Getenv("ERESA_CLIENT_SECRET"),
 	}
 
 	pcli, err := client.NewPeepaClient(pcfg)
 	if err != nil {
-		fmt.Errorf("failed to inizialize peepa client: %w", err)
-		os.Exit(0)
+		fmt.Fprintf(os.Stderr, "failed to initialize peepa client: %v\n", err)
+		os.Exit(1)
 	}
 
 	r := router.NewRouter(pcli)
