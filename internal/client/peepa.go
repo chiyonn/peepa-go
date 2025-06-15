@@ -1,6 +1,7 @@
 package client
 
 import (
+	"strings"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -201,6 +202,9 @@ func (c *PeepaClient) parseProductDetailResponse(data []byte) (*RawProduct, erro
 	}
 
 	jsonStr := rawResp.Data.GetProductDetail.JSON
+	if strings.TrimSpace(jsonStr) == "" {
+    return nil, errors.New("product detail JSON is empty")
+	}
 	var products []RawProduct
 	if err := json.Unmarshal([]byte(jsonStr), &products); err != nil {
 		return nil, fmt.Errorf("failed to parse product JSON: %w", err)
