@@ -1,12 +1,13 @@
 package main
 
 import (
-	"os"
-	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/chiyonn/peepa-go/internal/client"
 	"github.com/chiyonn/peepa-go/internal/router"
+	"github.com/chiyonn/peepa-go/internal/service"
 )
 
 func main() {
@@ -17,13 +18,24 @@ func main() {
 		RefreshToken: os.Getenv("ERESA_REFRESH_TOKEN"),
 	}
 
-	pcli, err := client.NewPeepaClient(pcfg)
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+	logger := slog.New(handler)
+
+	pcli, err := client.NewPeepaClient(pcfg, logger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to initialize peepa client: %v\n", err)
+		logger.Error("failed to initialize peepa client", slog.Any("error", err))
 		os.Exit(1)
 	}
 
-	r := router.NewRouter(pcli)
+	psrv := service.NewProductService(pcli, logger)
 
-	http.ListenAndServe(":8080", r)
+	r := router.NewRouter(psrv, logger)
+
+	logger.Info("Starting server", slog.String("addr", ":8080"))
+	if err := http.ListenAndServe(":8080", r); err != nil {
+		logger.Error("Server failed", slog.Any("error", err))
+		os.Exit(1)
+	}
 }

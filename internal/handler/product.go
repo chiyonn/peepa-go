@@ -2,30 +2,35 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/chiyonn/peepa-go/internal/client"
+	"github.com/chiyonn/peepa-go/internal/service"
 )
 
 type ProductHandler struct {
-	cli *client.PeepaClient
+	srv *service.ProductService
+	log *slog.Logger
 }
 
-func NewProductHandler(cli *client.PeepaClient) *ProductHandler {
+func NewProductHandler(srv *service.ProductService, log *slog.Logger) *ProductHandler {
 	return &ProductHandler{
-		cli: cli,
+		srv: srv,
+		log: log,
 	}
 }
 
 func (h *ProductHandler) GetByASIN(w http.ResponseWriter, r *http.Request) {
 	asin := chi.URLParam(r, "asin")
+	if asin == "" {
+		http.Error(w, "asin required", http.StatusBadRequest)
+	}
 
-	product, err := h.cli.GetByASIN(asin)
+	product, err := h.srv.GetByASIN(asin)
 	if err != nil {
-		log.Printf("failed to get product: %v", err)
+		h.log.Error("failed to get product: %v", "error", err)
 		http.Error(w, "failed to fetch product", http.StatusInternalServerError)
 		return
 	}
@@ -34,7 +39,7 @@ func (h *ProductHandler) GetByASIN(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(product); err != nil {
-		log.Printf("failed to encode response: %v", err)
+		h.log.Error("failed to encode response: %v", "error", err)
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 	}
 }
