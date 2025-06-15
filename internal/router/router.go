@@ -1,15 +1,17 @@
 package router
 
 import (
+	"log/slog"
+
 	"github.com/go-chi/chi/v5"
 
-	"github.com/chiyonn/peepa-go/internal/client"
 	"github.com/chiyonn/peepa-go/internal/handler"
+	"github.com/chiyonn/peepa-go/internal/service"
 )
 
-func NewRouter(pc *client.PeepaClient) *chi.Mux {
+func NewRouter(srv *service.ProductService, log *slog.Logger) *chi.Mux {
 	r := chi.NewRouter()
-	h := handler.NewProductHandler(pc)
+	h := handler.NewProductHandler(srv, log)
 
 	r.Get("/products/{asin}", h.GetByASIN)
 

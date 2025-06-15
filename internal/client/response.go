@@ -18,7 +18,8 @@ type MetaData struct {
 	JSON      string `json:"json"`
 }
 
-type Product struct {
+type RawProduct struct {
+	ASIN string `json:"asin"`
 	Title string `json:"title"`
 	Categories []int64 `json:"categories"`
 	ImagesCSV string `json:"imagesCSV"`
