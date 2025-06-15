@@ -6,43 +6,110 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
+
+	"log/slog"
 )
 
 type PeepaClient struct {
 	hc          *http.Client
+	log         *slog.Logger
 	cfg         *PeepaConfig
 	accessToken string
 }
 
 var ErrInvalidConfig = errors.New("config must be set")
 
-func NewPeepaClient(cfg *PeepaConfig) (*PeepaClient, error) {
-	if cfg.Host == "" || cfg.AuthHost == "" || cfg.ClientID == "" || cfg.RefreshToken == "" {
-		return nil, ErrInvalidConfig
+func NewPeepaClient(cfg *PeepaConfig, log *slog.Logger) (*PeepaClient, error) {
+	if err := validateConfig(cfg); err != nil {
+		return nil, err
+	}
+	if log == nil {
+		log = slog.Default()
 	}
 	return &PeepaClient{
 		hc:  &http.Client{Timeout: 5 * time.Second},
 		cfg: cfg,
+		log: log,
 	}, nil
 }
 
-func (c *PeepaClient) getAccessToken() (string, error) {
+func validateConfig(cfg *PeepaConfig) error {
+	var missing []string
+	if cfg.Host == "" {
+		missing = append(missing, "Host")
+	}
+	if cfg.AuthHost == "" {
+		missing = append(missing, "AuthHost")
+	}
+	if cfg.ClientID == "" {
+		missing = append(missing, "ClientID")
+	}
+	if cfg.RefreshToken == "" {
+		missing = append(missing, "RefreshToken")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing config fields: %v", missing)
+	}
+	return nil
+}
+
+func buildTokenRequestBody(cfg *PeepaConfig) (io.Reader, error) {
 	body := map[string]any{
-		"ClientId": c.cfg.ClientID,
+		"ClientId": cfg.ClientID,
 		"AuthFlow": "REFRESH_TOKEN_AUTH",
 		"AuthParameters": map[string]string{
-			"REFRESH_TOKEN": c.cfg.RefreshToken,
+			"REFRESH_TOKEN": cfg.RefreshToken,
 		},
 	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(bodyBytes), nil
+}
+
+func buildProductRequestBody(vars ProductDetailVariables) (io.Reader, error) {
+	body := ProductDetailRequest{
+		Query: `
+			query GetProductDetail($asin: String, $domain: String, $isLite: Boolean, $isDetail: Boolean, $nocache: Boolean, $countpv: Boolean) {
+				getProductDetail(asin: $asin, domain: $domain, isLite: $isLite, isDetail: $isDetail, nocache: $nocache, countpv: $countpv) {
+					asin
+					json
+					createdAt
+					updatedAt
+					__typename
+				}
+			}`,
+		Variables: vars,
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(bodyBytes), nil
+}
+
+func (c *PeepaClient) ensureAccessToken() error {
+	if c.accessToken != "" {
+		return nil
+	}
+	t, err := c.getAccessToken()
+	if err != nil {
+		return fmt.Errorf("failed to initialize access token: %w", err)
+	}
+	c.accessToken = t
+	return nil
+}
+
+func (c *PeepaClient) getAccessToken() (string, error) {
+	body, err := buildTokenRequestBody(c.cfg)
+	if err != nil {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", c.cfg.AuthHost, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequest("POST", c.cfg.AuthHost, body)
 	if err != nil {
 		return "", err
 	}
@@ -61,7 +128,6 @@ func (c *PeepaClient) getAccessToken() (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println(resp)
 		return "", fmt.Errorf("auth request failed with status: %s", resp.Status)
 	}
 
@@ -73,51 +139,34 @@ func (c *PeepaClient) getAccessToken() (string, error) {
 	return authResp.Result.AccessToken, nil
 }
 
-func (c *PeepaClient) ensureAccessToken() error {
-	if c.accessToken != "" {
-		return nil
-	}
-	t, err := c.getAccessToken()
-	if err != nil {
-		return fmt.Errorf("failed to initialize access token: %w", err)
-	}
-	c.accessToken = t
-	return nil
-}
-
-func (c *PeepaClient) GetByASIN(asin string) (*Product, error) {
+func (c *PeepaClient) GetByASIN(asin string) (*RawProduct, error) {
 	if err := c.ensureAccessToken(); err != nil {
 		return nil, err
 	}
 
-	reqBody := ProductDetailRequest{
-		Query: `
-			query GetProductDetail($asin: String, $domain: String, $isLite: Boolean, $isDetail: Boolean, $nocache: Boolean, $countpv: Boolean) {
-				getProductDetail(asin: $asin, domain: $domain, isLite: $isLite, isDetail: $isDetail, nocache: $nocache, countpv: $countpv) {
-					asin
-					json
-					createdAt
-					updatedAt
-					__typename
-				}
-			}`,
-		Variables: ProductDetailVariables{
-			ASIN:     asin,
-			Domain:   "5",
-			IsLite:   false,
-			IsDetail: true,
-			NoCache:  false,
-			CountPV:  false,
-		},
+	respBody, err := c.doGraphQLRequest(asin)
+	if err != nil {
+		return nil, err
 	}
 
-	bodyBytes, err := json.Marshal(reqBody)
+	return c.parseProductDetailResponse(respBody)
+}
+
+func (c *PeepaClient) doGraphQLRequest(asin string) ([]byte, error) {
+	body, err := buildProductRequestBody(ProductDetailVariables{
+		ASIN:     asin,
+		Domain:   "5",
+		IsLite:   false,
+		IsDetail: true,
+		NoCache:  false,
+		CountPV:  false,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	url := fmt.Sprintf("%s/graphql", c.cfg.Host)
-	req, err := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
+	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -138,25 +187,29 @@ func (c *PeepaClient) GetByASIN(asin string) (*Product, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s – %s", resp.Status, string(bodyBytes))
+		c.log.Error("GraphQL API error", "status", resp.Status, "body", string(bodyBytes))
+		return nil, fmt.Errorf("GraphQL request failed with status: %s", resp.Status)
 	}
 
-	bodyBytes, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
+	return io.ReadAll(resp.Body)
+}
 
+func (c *PeepaClient) parseProductDetailResponse(data []byte) (*RawProduct, error) {
 	var rawResp rawProductDetailResponse
-	if err := json.Unmarshal(bodyBytes, &rawResp); err != nil {
-		return nil, err
+	if err := json.Unmarshal(data, &rawResp); err != nil {
+		return nil, fmt.Errorf("failed to parse raw response: %w", err)
 	}
 
 	jsonStr := rawResp.Data.GetProductDetail.JSON
-	var products []Product
+	var products []RawProduct
 	if err := json.Unmarshal([]byte(jsonStr), &products); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse product JSON: %w", err)
 	}
 
-	log.Printf("Fetched product detail: %+v\n", products[0])
+	if len(products) == 0 {
+		return nil, errors.New("no product found")
+	}
+
+	c.log.Info("Fetched product detail", "product", products[0].ASIN)
 	return &products[0], nil
 }
