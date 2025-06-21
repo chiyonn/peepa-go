@@ -2,7 +2,6 @@ package model
 
 import (
 	"strings"
-	"time"
 
 	"github.com/chiyonn/peepa-go/internal/client"
 )
@@ -16,8 +15,8 @@ type Product struct {
 	Brand string
 	Manifacturer string
 	Offers []*Offer
-	LastPriceChange time.Time
-	LastUpdated time.Time
+	LastPriceChange int64
+	LastUpdated int64
 }
 
 func toOffers(raws []client.RawOffer) []*Offer {
@@ -38,7 +37,7 @@ func NewProduct(p *client.RawProduct) *Product {
 		Brand: p.Brand,
 		Manifacturer: p.Manifacturer,
 		Offers: toOffers(p.Offers),
-		LastPriceChange: time.Unix(p.LastPriceChange, 0),
-		LastUpdated: time.Unix(p.LastUpdate, 0),
+		LastPriceChange: p.LastPriceChange,
+		LastUpdated: p.LastUpdate,
 	}
 }
