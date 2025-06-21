@@ -15,6 +15,7 @@ type Product struct {
 	Brand string
 	Manifacturer string
 	Offers []*Offer
+	BuyBoxPrice int64
 	LastPriceChange int64
 	LastUpdated int64
 }
