@@ -22,8 +22,13 @@ func NewProductService(cli *client.PeepaClient, log *slog.Logger) *ProductServic
 func (s *ProductService) GetByASIN(asin string) (*model.Product, error) {
 	raw, err := s.cli.GetByASIN(asin)
 	if err != nil {
-		s.log.Error("failed to get product from client: %v", "error", err)
+		s.log.Error("failed to get product from client", "error", err)
+		return nil, err
 	}
-	product := model.NewProduct(raw)
+	product, err := model.NewProduct(raw)
+	if err != nil {
+		s.log.Error("failed to create product from raw data", "error", err)
+		return nil, err
+	}
 	return product, nil
 }

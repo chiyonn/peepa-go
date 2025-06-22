@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/chiyonn/peepa-go/internal/client"
@@ -29,7 +30,10 @@ func toOffers(raws []client.RawOffer) []*Offer {
 	return offers
 }
 
-func NewProduct(p *client.RawProduct) *Product {
+func NewProduct(p *client.RawProduct) (*Product, error) {
+	if p == nil {
+		return nil, ErrRawNill
+	}
 	return &Product{
 		ASIN:            p.ASIN,
 		Title:           p.Title,
@@ -42,5 +46,7 @@ func NewProduct(p *client.RawProduct) *Product {
 		Stats:           NewStats(p.Stats),
 		LastPriceChange: p.LastPriceChange,
 		LastUpdated:     p.LastUpdate,
-	}
+	}, nil
 }
+
+var ErrRawNill = errors.New("cannot perse nil")
