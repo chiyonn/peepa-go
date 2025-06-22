@@ -7,17 +7,18 @@ import (
 )
 
 type Product struct {
-	ASIN       string
-	Title      string
-	RootCategory int64
-	Categories []int64
-	Images     []string
-	Brand string
-	Manifacturer string
-	Offers []*Offer
-	BuyBoxPrice int64
+	ASIN            string
+	Title           string
+	RootCategory    int64
+	Categories      []int64
+	Images          []string
+	Brand           string
+	Manifacturer    string
+	Offers          []*Offer
+	Stats           *Stats
+	BuyBoxPrice     int64
 	LastPriceChange int64
-	LastUpdated int64
+	LastUpdated     int64
 }
 
 func toOffers(raws []client.RawOffer) []*Offer {
@@ -30,15 +31,16 @@ func toOffers(raws []client.RawOffer) []*Offer {
 
 func NewProduct(p *client.RawProduct) *Product {
 	return &Product{
-		ASIN:       p.ASIN,
-		Title:      p.Title,
-		RootCategory: p.RootCategory,
-		Categories: p.Categories,
-		Images:     strings.Split(p.ImagesCSV, ","),
-		Brand: p.Brand,
-		Manifacturer: p.Manifacturer,
-		Offers: toOffers(p.Offers),
+		ASIN:            p.ASIN,
+		Title:           p.Title,
+		RootCategory:    p.RootCategory,
+		Categories:      p.Categories,
+		Images:          strings.Split(p.ImagesCSV, ","),
+		Brand:           p.Brand,
+		Manifacturer:    p.Manifacturer,
+		Offers:          toOffers(p.Offers),
+		Stats:           NewStats(p.Stats),
 		LastPriceChange: p.LastPriceChange,
-		LastUpdated: p.LastUpdate,
+		LastUpdated:     p.LastUpdate,
 	}
 }

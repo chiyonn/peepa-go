@@ -26,10 +26,14 @@ type RawProduct struct {
 	ImagesCSV       string     `json:"imagesCSV"`
 	Brand           string     `json:"brand"`
 	Manifacturer    string     `json:"manifacturer"`
-	BuyBoxPrice			int64 		 `json:"buyBoxPrice"`
+	Stats           RawStats   `json:"stats"`
 	Offers          []RawOffer `json:"offers"`
 	LastPriceChange int64      `json:"lastPriceChange"`
 	LastUpdate      int64      `json:"lastUpdated"`
+}
+
+type RawStats struct {
+	BuyBoxPrice int64 `json:"buyBoxPrice"`
 }
 
 type RawOffer struct {
