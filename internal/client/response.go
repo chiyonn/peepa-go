@@ -33,7 +33,11 @@ type RawProduct struct {
 }
 
 type RawStats struct {
-	BuyBoxPrice int64 `json:"buyBoxPrice"`
+	SalesRankDrops30  int64 `json:"salesRankDrops30"`
+	SalesRankDrops90  int64 `json:"salesRankDrops90"`
+	SalesRankDrops180 int64 `json:"salesRankDrops180"`
+	SalesRankDrops365 int64 `json:"salesRankDrops365"`
+	BuyBoxPrice       int64 `json:"buyBoxPrice"`
 }
 
 type RawOffer struct {
