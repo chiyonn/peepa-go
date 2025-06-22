@@ -30,7 +30,7 @@ func NewPeepaClient(cfg *PeepaConfig, log *slog.Logger) (*PeepaClient, error) {
 		log = slog.Default()
 	}
 	return &PeepaClient{
-		hc:  &http.Client{Timeout: 5 * time.Second},
+		hc:  &http.Client{Timeout: 10 * time.Second},
 		cfg: cfg,
 		log: log,
 	}, nil
