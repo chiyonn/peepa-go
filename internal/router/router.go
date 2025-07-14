@@ -11,9 +11,11 @@ import (
 
 func NewRouter(srv *service.ProductService, log *slog.Logger) *chi.Mux {
 	r := chi.NewRouter()
-	h := handler.NewProductHandler(srv, log)
+	hh := handler.NewHealthHandler(log)
+	ph := handler.NewProductHandler(srv, log)
 
-	r.Get("/products/{asin}", h.GetByASIN)
+	r.Get("/health", hh.GetHealth)
+	r.Get("/products/{asin}", ph.GetByASIN)
 
 	return r
 }
